@@ -40,6 +40,10 @@
             .url = "git+https://github.com/karlseguin/http.zig?ref=master#1c0ec3751c53e276d5e0c42b6d5481e72d9d1971",
             .hash = "httpz-0.0.0-PNVzrEktBwCzPoiua-S8LAYo2tILqczm3tSpneEzLQ9L",
         },
+        .zimq = .{
+            .url = "git+https://github.com/uyha/zimq.git#969d916e980472a5e7bd01d92fbea1af62256559",
+            .hash = "zimq-0.0.0-nw1ioFWoAQAfxoLYHAE-ImuPI4shK3S2OSPOWNyJOoN_",
+        },
     },
     .paths = .{
         "build.zig",
