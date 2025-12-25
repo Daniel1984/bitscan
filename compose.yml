@@ -31,3 +31,14 @@ services:
         "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable",
         "up",
       ]
+
+  bitcoin-node:
+    platform: linux/amd64
+    image: bitcoin/bitcoin:28.1
+    ports:
+      - "28333:28333"
+      - "38332:38332" # signet
+    volumes:
+      - .bitcoin:/home/bitcoin/.bitcoin
+    environment:
+      - BITCOIN_NETWORK=signet
