@@ -42,3 +42,4 @@ services:
       - .bitcoin:/home/bitcoin/.bitcoin
     environment:
       - BITCOIN_NETWORK=signet
+    restart: unless-stopped
