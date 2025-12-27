@@ -13,7 +13,7 @@ pub const Opts = struct {
 };
 
 pub fn init(allocator: std.mem.Allocator, opts: Opts) !Self {
-    return Self{
+    return .{
         .allocator = allocator,
         .stream_url = try allocator.dupeZ(u8, opts.stream_url),
         .shouldConsume = true,
@@ -52,7 +52,7 @@ fn connectSocket(self: *Self) !*zimq.Socket {
     return socket;
 }
 
-pub fn consume(self: *Self, cb: fn ([]const u8, []const u8) void) !void {
+pub fn consume(self: *Self, cb: fn ([]const u8, []const u8) void) void {
     var topic = zimq.Message.empty();
     var payload = zimq.Message.empty();
     var seq = zimq.Message.empty();
@@ -68,15 +68,15 @@ pub fn consume(self: *Self, cb: fn ([]const u8, []const u8) void) !void {
         while (self.shouldConsume) {
             _ = stream.recvMsg(&topic, .{}) catch |err| {
                 std.debug.print("failed to receive topic from stream: {}\n", .{err});
-                continue;
+                break;
             };
             _ = stream.recvMsg(&payload, .{}) catch |err| {
                 std.debug.print("failed to receive payload from stream: {}\n", .{err});
-                continue;
+                break;
             };
             _ = stream.recvMsg(&seq, .{}) catch |err| {
                 std.debug.print("failed to receive sequence from stream: {}\n", .{err});
-                continue;
+                break;
             };
 
             const topic_str = topic.slice();
