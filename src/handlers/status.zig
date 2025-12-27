@@ -13,7 +13,5 @@ pub fn get(app: *App, req: *httpz.Request, res: *httpz.Response) !void {
     };
 
     std.log.info("200 {} {s}", .{ req.method, req.url.path });
-    try res.json(.{
-        .status = "OK",
-    }, .{});
+    try res.json(.{ .status = 200, .body = "{}" }, .{});
 }
