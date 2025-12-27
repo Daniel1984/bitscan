@@ -3,6 +3,7 @@ const httpz = @import("httpz");
 const Db = @import("./db.zig").Db;
 
 db: *Db,
+allocator: std.mem.Allocator,
 
 pub const App = @This();
 
@@ -18,8 +19,9 @@ pub fn uncaughtError(_: *App, req: *httpz.Request, res: *httpz.Response, err: an
     res.body = "Oops, something went wrong...";
 }
 
-pub fn init(db: *Db) App {
+pub fn init(db: *Db, allocator: std.mem.Allocator) App {
     return .{
         .db = db,
+        .allocator = allocator,
     };
 }
