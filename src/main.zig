@@ -4,6 +4,10 @@ const Env = @import("./env.zig");
 const Db = @import("./db.zig").Db;
 const App = @import("./app.zig");
 const handlers = @import("./handlers/handlers.zig");
+const Stream = @import("./stream.zig");
+const MsgProcessor = @import("./msgprocessor.zig");
+
+var msg_processor: MsgProcessor = undefined;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -19,7 +23,7 @@ pub fn main() !void {
     defer dbpool.deinit();
     try dbpool.ping();
 
-    var app = App.init(dbpool);
+    var app = App.init(dbpool, allocator);
 
     var server = try httpz.Server(*App).init(allocator, .{ .port = port, .address = "0.0.0.0" }, &app);
     defer server.deinit();
@@ -28,6 +32,23 @@ pub fn main() !void {
     var router = try server.router(.{});
     router.get("/status", handlers.getStatus, .{});
 
+    var zmq_stream = try Stream.init(allocator, .{ .stream_url = "tcp://127.0.0.1:28333" });
+    defer zmq_stream.deinit();
+
+    msg_processor = MsgProcessor.init(allocator, dbpool);
+    defer msg_processor.deinit();
+
+    const stream_thread = try std.Thread.spawn(.{}, consumeStream, .{&zmq_stream});
+    defer stream_thread.join();
+
     std.log.info("server started at port: {d}", .{port});
     try server.listen();
+}
+
+fn handleMessageWrapper(topic: []const u8, msg: []const u8) void {
+    msg_processor.processMsg(topic, msg);
+}
+
+fn consumeStream(s: *Stream) void {
+    s.consume(handleMessageWrapper);
 }
