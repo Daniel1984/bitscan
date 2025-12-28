@@ -42,10 +42,11 @@ fn connectSocket(self: *Self) !*zimq.Socket {
     const socket = try zimq.Socket.init(self.context.?, .sub);
 
     // subscribe to ALL topics ("")
-    try socket.set(.subscribe, "");
+    // try socket.set(.subscribe, "");
     // or be explicit
     // try socket.set(.subscribe, "rawblock");
     // try socket.set(.subscribe, "rawtx");
+    try socket.set(.subscribe, "hashblock");
 
     try socket.connect(self.stream_url);
     std.debug.print("[ZMQ] connected\n", .{});
