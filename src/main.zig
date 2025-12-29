@@ -5,9 +5,10 @@ const Db = @import("./db.zig").Db;
 const App = @import("./app.zig");
 const handlers = @import("./handlers/handlers.zig");
 const Stream = @import("./stream.zig");
-const MsgProcessor = @import("./msgprocessor.zig");
+const StreamProcessor = @import("./streamprocessor.zig");
+const Backfill = @import("./backfill.zig");
 
-var msg_processor: MsgProcessor = undefined;
+var msg_processor: StreamProcessor = undefined;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -39,11 +40,18 @@ pub fn main() !void {
     var zmq_stream = try Stream.init(allocator, .{ .stream_url = zmq_endpoint });
     defer zmq_stream.deinit();
 
-    msg_processor = MsgProcessor.init(allocator, dbpool, btc_rest_endpoint);
-    defer msg_processor.deinit();
-
+    msg_processor = StreamProcessor.init(allocator, dbpool, btc_rest_endpoint);
     const stream_thread = try std.Thread.spawn(.{}, consumeStream, .{&zmq_stream});
     defer stream_thread.join();
+
+    const backfill = Backfill.init(allocator, .{
+        .btc_rest_endpoint = btc_rest_endpoint,
+        .from_block = 0,
+        .to_block = 10,
+    });
+
+    const hash = try backfill.getBlockHash(0);
+    std.log.info("Block hash for height: {s}", .{hash});
 
     std.log.info("server started at port: {d}", .{api_port});
     try server.listen();
