@@ -10,9 +10,9 @@ allocator: std.mem.Allocator,
 btc_rest_endpoint: []const u8,
 db: *Db,
 
-pub const MsgProcessor = @This();
+pub const StreamProcessor = @This();
 
-pub fn init(a: std.mem.Allocator, d: *Db, b: []const u8) MsgProcessor {
+pub fn init(a: std.mem.Allocator, d: *Db, b: []const u8) StreamProcessor {
     return .{
         .allocator = a,
         .db = d,
@@ -20,7 +20,7 @@ pub fn init(a: std.mem.Allocator, d: *Db, b: []const u8) MsgProcessor {
     };
 }
 
-pub fn processMsg(self: MsgProcessor, topic: []const u8, msg: []const u8) void {
+pub fn processMsg(self: StreamProcessor, topic: []const u8, msg: []const u8) void {
     if (!std.mem.eql(u8, topic, "hashblock")) return;
     std.debug.print("[ZMQ] topic={s} size={}\n", .{ topic, msg.len });
 
@@ -31,14 +31,14 @@ pub fn processMsg(self: MsgProcessor, topic: []const u8, msg: []const u8) void {
         _ = std.fmt.bufPrint(hex_string[i * 2 .. i * 2 + 2], "{x:0>2}", .{byte}) catch return;
     }
 
-    std.debug.print("[ZMQ] hex: {s}\n", .{hex_string});
+    std.debug.print("[ZMQ] block hash hex: {s}\n", .{hex_string});
 
     self.fetchBlock(hex_string) catch |err| {
         std.debug.print("Error fetching transaction: {}\n", .{err});
     };
 }
 
-fn fetchBlock(self: MsgProcessor, tx_hash: []const u8) !void {
+fn fetchBlock(self: StreamProcessor, tx_hash: []const u8) !void {
     var url_buf: [128]u8 = undefined;
     const url_str = try std.fmt.bufPrint(&url_buf, "{s}/block/{s}.json", .{ self.btc_rest_endpoint, tx_hash });
     const body = try request.get(self.allocator, url_str);
