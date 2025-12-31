@@ -1,6 +1,11 @@
 const std = @import("std");
 const zimq = @import("zimq");
 
+pub const Message = struct {
+    topic: []const u8,
+    payload: []const u8,
+};
+
 const Self = @This();
 
 allocator: std.mem.Allocator,
@@ -35,7 +40,6 @@ fn deinitStream(self: *Self) void {
 }
 
 fn connectSocket(self: *Self) !*zimq.Socket {
-    self.deinitStream();
     std.debug.print("[ZMQ] connecting to {s}\n", .{self.stream_url});
 
     self.context = try zimq.Context.init();
@@ -53,39 +57,36 @@ fn connectSocket(self: *Self) !*zimq.Socket {
     return socket;
 }
 
-pub fn consume(self: *Self, cb: fn ([]const u8, []const u8) void) void {
+pub fn next(self: *Self) !Message {
     var topic = zimq.Message.empty();
     var payload = zimq.Message.empty();
     var seq = zimq.Message.empty();
 
     while (self.shouldConsume) {
-        const stream = self.connectSocket() catch |err| {
-            std.debug.print("connection failed: {}, retrying in 5 seconds...\n", .{err});
-            std.Thread.sleep(5 * std.time.ns_per_s);
+        const socket = self.connectSocket() catch {
+            std.Thread.sleep(2 * std.time.ns_per_s);
             continue;
         };
-        defer stream.deinit();
+        defer socket.deinit();
 
-        while (self.shouldConsume) {
-            _ = stream.recvMsg(&topic, .{}) catch |err| {
-                std.debug.print("failed to receive topic from stream: {}\n", .{err});
-                break;
-            };
-            _ = stream.recvMsg(&payload, .{}) catch |err| {
-                std.debug.print("failed to receive payload from stream: {}\n", .{err});
-                break;
-            };
-            _ = stream.recvMsg(&seq, .{}) catch |err| {
-                std.debug.print("failed to receive sequence from stream: {}\n", .{err});
-                break;
-            };
+        _ = socket.recvMsg(&topic, .{}) catch {
+            self.deinitStream();
+            continue;
+        };
+        _ = socket.recvMsg(&payload, .{}) catch {
+            self.deinitStream();
+            continue;
+        };
+        _ = socket.recvMsg(&seq, .{}) catch {
+            self.deinitStream();
+            continue;
+        };
 
-            const topic_str = topic.slice();
-            const data = payload.slice();
-            cb(topic_str, data);
-        }
-
-        std.debug.print("reconnecting in 2 seconds...\n", .{});
-        std.Thread.sleep(2 * std.time.ns_per_s);
+        return .{
+            .topic = topic.slice(),
+            .payload = payload.slice(),
+        };
     }
+
+    return error.StreamClosed;
 }
