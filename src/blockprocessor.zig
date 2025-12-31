@@ -10,7 +10,7 @@ pub const Opts = struct {
     btc_rest_endpoint: []const u8,
 };
 
-const BlockProcessor = struct {
+pub const BlockProcessor = struct {
     allocator: std.mem.Allocator,
     btc_rest_endpoint: []const u8,
     db: *Db,
@@ -20,12 +20,12 @@ const BlockProcessor = struct {
     }
 
     pub fn deinit(self: BlockProcessor) void {
-        self.allocator.free(self);
+        self.allocator.free(self.btc_rest_endpoint);
     }
 
-    pub fn fetchBlock(self: BlockProcessor, tx_hash: []const u8) !void {
+    pub fn process(self: BlockProcessor, block_hash: []const u8) !void {
         var url_buf: [128]u8 = undefined;
-        const url_str = try std.fmt.bufPrint(&url_buf, "{s}/block/{s}.json", .{ self.btc_rest_endpoint, tx_hash });
+        const url_str = try std.fmt.bufPrint(&url_buf, "{s}/block/{s}.json", .{ self.btc_rest_endpoint, block_hash });
         const body = try request.get(self.allocator, url_str);
         defer self.allocator.free(body);
 
@@ -41,10 +41,19 @@ const BlockProcessor = struct {
             std.debug.print("txid: {s} with {d} inputs and {d} outputs\n", .{ tx.txid, tx.vin.len, tx.vout.len });
 
             for (tx.vin, 0..) |input, i| {
+                std.debug.print("Input {d}:\n", .{i});
                 if (input.coinbase) |coinbase| {
-                    std.debug.print("  Input {d}: Coinbase - {s}\n", .{ i, coinbase });
+                    std.debug.print("\tCoinbase - {s}\n", .{coinbase});
                 } else if (input.txid) |txid| {
-                    std.debug.print("  Input {d}: Spends {s}:{d}\n", .{ i, txid, input.vout orelse 0 });
+                    std.debug.print("\tSpends {s}:{d}\n", .{ txid, input.vout orelse 0 });
+                }
+            }
+
+            for (tx.vout, 0..) |output, i| {
+                std.debug.print("Output {d}:\n", .{i});
+                std.debug.print("\tValue {d}\n", .{output.value});
+                if (output.scriptPubKey.address) |address| {
+                    std.debug.print("\tAddress {s}\n", .{address});
                 }
             }
         }
