@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub fn Fifo(comptime T: type) type {
+pub fn MsgQueue(comptime T: type) type {
     return struct {
         allocator: std.mem.Allocator,
         list: std.ArrayList(T),
@@ -9,10 +9,10 @@ pub fn Fifo(comptime T: type) type {
 
         const Self = @This();
 
-        pub fn init(allocator: std.mem.Allocator) Fifo(T) {
+        pub fn init(allocator: std.mem.Allocator) !MsgQueue(T) {
             return .{
                 .allocator = allocator,
-                .list = std.ArrayList(T){},
+                .list = try std.ArrayList(T).initCapacity(allocator, 1024),
                 .mutex = .{},
                 .cond = .{},
             };
@@ -30,7 +30,7 @@ pub fn Fifo(comptime T: type) type {
             self.cond.signal(); // tell processor there's work to do
         }
 
-        pub fn receive(self: *Self) T {
+        pub fn receive(self: *Self) ?T {
             self.mutex.lock();
             defer self.mutex.unlock();
 
@@ -39,8 +39,11 @@ pub fn Fifo(comptime T: type) type {
                 self.cond.wait(&self.mutex);
             }
 
-            // get the first item (FIFO behavior)
-            return self.list.orderedRemove(0);
+            // get the first item (MsgQueue behavior)
+            // return self.list.orderedRemove(0);
+
+            // pop for O(1) and better performance if order doesn't matter
+            return self.list.pop();
         }
     };
 }
