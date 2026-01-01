@@ -1,9 +1,8 @@
 const std = @import("std");
 const Stream = @import("./stream.zig");
-const StreamProcessor = @import("./streamprocessor.zig");
 const Backfill = @import("./backfill.zig");
 const BlockProcessor = @import("./blockprocessor.zig").BlockProcessor;
-const Fifo = @import("./fifo.zig").Fifo;
+const MsgQueue = @import("./msgqueue.zig").MsgQueue;
 
 pub const BlockJob = struct {
     hash: []const u8,
@@ -12,14 +11,10 @@ pub const BlockJob = struct {
 
 pub const Runtime = struct {
     allocator: std.mem.Allocator,
-
     stream: *Stream,
-    stream_processor: *StreamProcessor,
     backfill: *Backfill,
     block_processor: *BlockProcessor,
-
-    fifo: Fifo(BlockJob),
-
+    msg_queue: MsgQueue(BlockJob),
     zmq_thread: ?std.Thread = null,
     backfill_thread: ?std.Thread = null,
     consumer_thread: ?std.Thread = null,
@@ -27,17 +22,15 @@ pub const Runtime = struct {
     pub fn init(
         allocator: std.mem.Allocator,
         stream: *Stream,
-        stream_processor: *StreamProcessor,
         backfill: *Backfill,
         block_processor: *BlockProcessor,
-    ) Runtime {
+    ) !Runtime {
         return .{
             .allocator = allocator,
             .stream = stream,
-            .stream_processor = stream_processor,
             .backfill = backfill,
             .block_processor = block_processor,
-            .fifo = Fifo(BlockJob).init(allocator),
+            .msg_queue = try MsgQueue(BlockJob).init(allocator),
         };
     }
 
@@ -57,36 +50,47 @@ pub const Runtime = struct {
 
     fn zmqLoop(self: *Runtime) void {
         while (true) {
-            const msg = self.stream.next() catch continue;
+            const msg = self.stream.next() catch {
+                // pause to avoid busy-waiting on connection errors
+                std.Thread.sleep(1000 * std.time.ns_per_ms);
+                continue;
+            };
+
+            defer {
+                self.allocator.free(msg.topic);
+                self.allocator.free(msg.payload);
+            }
 
             if (!std.mem.eql(u8, msg.topic, "hashblock")) continue;
 
-            const hash = self.stream_processor.toHex(msg.payload) catch continue;
+            const hash = self.stream.toHex(msg.payload) catch continue;
 
-            self.fifo.send(.{
+            self.msg_queue.send(.{
                 .hash = hash,
                 .source = .zmq,
-            }) catch {};
+            }) catch {
+                self.allocator.free(hash);
+            };
         }
     }
 
     fn backfillLoop(self: *Runtime) void {
-        var h: u32 = 0;
-        while (h <= 10) : (h += 1) {
+        var h: u32 = 285190;
+        while (h <= 285193) : (h += 1) {
             const hash = self.backfill.getBlockHash(h) catch continue;
 
-            self.fifo.send(.{
+            self.msg_queue.send(.{
                 .hash = hash,
                 .source = .backfill,
             }) catch {};
 
-            std.Thread.sleep(1000 * std.time.ns_per_ms);
+            std.Thread.sleep(100 * std.time.ns_per_ms);
         }
     }
 
     fn consumerLoop(self: *Runtime) void {
         while (true) {
-            const job = self.fifo.receive();
+            const job = self.msg_queue.receive() orelse continue;
             defer self.allocator.free(job.hash);
 
             self.block_processor.process(job.hash) catch |err| {
