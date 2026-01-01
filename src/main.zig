@@ -4,7 +4,6 @@ const Env = @import("./env.zig");
 const Db = @import("./db.zig").Db;
 const App = @import("./app.zig");
 const Stream = @import("./stream.zig");
-const StreamProcessor = @import("./streamprocessor.zig");
 const Backfill = @import("./backfill.zig");
 const BlockProcessor = @import("./blockprocessor.zig").BlockProcessor;
 const Runtime = @import("./runtime.zig").Runtime;
@@ -31,15 +30,13 @@ pub fn main() !void {
     defer zmq_stream.deinit();
 
     var backfill = Backfill.init(allocator, .{ .btc_rest_endpoint = btc_rest_endpoint });
-    var stream_processor = StreamProcessor.init(allocator);
 
     var block_processor = BlockProcessor.init(allocator, .{ .btc_rest_endpoint = btc_rest_endpoint, .db = dbpool });
     defer block_processor.deinit();
 
-    var runtime = Runtime.init(
+    var runtime = try Runtime.init(
         allocator,
         &zmq_stream,
-        &stream_processor,
         &backfill,
         &block_processor,
     );
