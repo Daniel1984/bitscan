@@ -50,8 +50,21 @@ pub const Transaction = struct {
 
 pub const BlockResponse = struct {
     hash: []const u8,
-    confirmations: i32,
+    previousblockhash: []const u8,
+    nextblockhash: []const u8,
+    merkleroot: []const u8,
+    nTx: u32,
+    time: u32,
+    mediantime: u64,
     height: u32,
-    version: i32,
+    version: u32,
+    versionHex: []const u8,
+    bits: []const u8,
+    difficulty: f64,
+    fee: f64,
+    chainwork: []const u8,
+    strippedsize: u32,
+    weight: u32,
+    size: u32,
     tx: []Transaction,
 };
