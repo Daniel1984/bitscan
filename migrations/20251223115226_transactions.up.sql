@@ -1,12 +1,18 @@
 CREATE TABLE IF NOT EXISTS transactions (
-  txid          TEXT PRIMARY KEY,
-  block_height  INT REFERENCES blocks(height),
-  tx_index      INT NOT NULL,
-  is_coinbase   BOOLEAN NOT NULL DEFAULT FALSE,
-  fee_sats      BIGINT DEFAULT 0,
-  UNIQUE(block_height, tx_index)
+  id          BIGSERIAL PRIMARY KEY,
+  block_id    BIGINT NOT NULL REFERENCES blocks(id) ON DELETE CASCADE,
+  txid        TEXT NOT NULL UNIQUE,
+  tx_index    INT NOT NULL,
+  version     INT NOT NULL,
+  size        INT NOT NULL,
+  vsize       INT NOT NULL,
+  weight      INT NOT NULL,
+  locktime    BIGINT NOT NULL,
+  is_coinbase BOOLEAN NOT NULL DEFAULT FALSE,
+  fee         NUMERIC NOT NULL DEFAULT 0,
+  UNIQUE      (block_id, tx_index)
 );
 
-CREATE INDEX ON transactions(block_height);
-CREATE INDEX ON transactions(block_height, tx_index);
-CREATE INDEX ON transactions(is_coinbase);
+CREATE INDEX idx_transactions_block_id ON transactions(block_id);
+CREATE INDEX idx_transactions_coinbase ON transactions(is_coinbase) WHERE is_coinbase = TRUE;
+CREATE UNIQUE INDEX idx_transactions_txid ON transactions(txid);

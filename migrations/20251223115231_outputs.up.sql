@@ -1,18 +1,15 @@
 CREATE TABLE IF NOT EXISTS outputs (
-  txid          TEXT NOT NULL,
-  vout          INT NOT NULL,
-  value_sats    BIGINT NOT NULL,
-  script_pubkey TEXT NOT NULL,
-  address       TEXT,
-  spent         BOOLEAN NOT NULL DEFAULT FALSE,
-  spent_by_txid TEXT,
-  spent_by_vin  INT,
-  spent_height  INT,
-  PRIMARY KEY (txid, vout),
-  FOREIGN KEY (txid) REFERENCES transactions(txid)
+  transaction_id     BIGINT NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+  txid               TEXT NOT NULL,
+  vout               INT NOT NULL,     -- vout[i].vout
+  value              NUMERIC NOT NULL, -- vout[i].value * 100_000_000 if in sats, type -> BIGINT
+  script_pubkey_hex  TEXT NOT NULL,    -- vout[i].scriptPubKey.hex
+  script_type        TEXT NOT NULL,    -- vout[i].scriptPubKey.type
+  address            TEXT,             -- vout[i].scriptPubKey.address
+  PRIMARY KEY (txid, vout)
 );
 
-CREATE INDEX ON outputs(address) WHERE address IS NOT NULL;
-CREATE INDEX ON outputs(spent);
-CREATE INDEX ON outputs(address, spent) WHERE address IS NOT NULL;
-CREATE INDEX ON outputs(spent_by_txid, spent_by_vin) WHERE spent = TRUE;
+CREATE INDEX idx_outputs_transaction_id ON outputs(transaction_id);
+CREATE INDEX idx_outputs_txid_vout ON outputs(txid, vout);
+CREATE INDEX idx_outputs_address ON outputs(address) WHERE address IS NOT NULL;
+CREATE INDEX idx_outputs_script_type ON outputs(script_type);

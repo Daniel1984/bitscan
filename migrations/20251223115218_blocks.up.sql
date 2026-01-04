@@ -4,7 +4,6 @@ CREATE TABLE IF NOT EXISTS blocks (
   hash               TEXT NOT NULL UNIQUE,
   previous_hash      TEXT,
   next_hash          TEXT,
-  merkleroot         TEXT NOT NULL,
   chainwork          TEXT NOT NULL,
   version            INT NOT NULL,
   version_hex        TEXT NOT NULL,
