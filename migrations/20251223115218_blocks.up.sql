@@ -9,12 +9,12 @@ CREATE TABLE IF NOT EXISTS blocks (
   version_hex        TEXT NOT NULL,
   bits               TEXT NOT NULL,
   difficulty         NUMERIC NOT NULL,
-  time               TIMESTAMP NOT NULL,
+  time               BIGINT NOT NULL,
   mediantime         BIGINT NOT NULL,
   stripped_size      INT NOT NULL,
   size               INT NOT NULL,
   weight             INT NOT NULL,
-  fee                NUMERIC NOT NULL,
+  fee                NUMERIC NOT NULL DEFAULT 0,
   tx_count           INT NOT NULL DEFAULT 0
 );
 

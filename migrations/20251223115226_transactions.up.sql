@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   weight      INT NOT NULL,
   locktime    BIGINT NOT NULL,
   is_coinbase BOOLEAN NOT NULL DEFAULT FALSE,
-  fee         NUMERIC NOT NULL DEFAULT 0,
+  fee         BIGINT NOT NULL DEFAULT 0,
   UNIQUE      (block_id, tx_index)
 );
 
