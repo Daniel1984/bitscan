@@ -9,13 +9,14 @@ pub const ScriptPubKey = struct {
 };
 
 pub const Output = struct {
+    transaction_id: ?u64 = 0,
     value: f64,
     n: u32,
     scriptPubKey: ScriptPubKey,
 };
 
 pub const Input = struct {
-    // common fields
+    transaction_id: ?u64 = 0,
     sequence: u64,
     txinwitness: ?[]json.Value = null,
 
@@ -37,8 +38,10 @@ pub const Prevout = struct {
 };
 
 pub const Transaction = struct {
+    id: ?u64 = 0,
+    block_id: ?u64 = 0,
+    fee: f64 = 0,
     txid: []const u8,
-    hash: []const u8,
     version: i32,
     size: u32,
     vsize: u32,
@@ -49,6 +52,7 @@ pub const Transaction = struct {
 };
 
 pub const BlockResponse = struct {
+    id: ?u64 = 0,
     hash: []const u8,
     previousblockhash: []const u8,
     nextblockhash: []const u8,
@@ -61,7 +65,6 @@ pub const BlockResponse = struct {
     versionHex: []const u8,
     bits: []const u8,
     difficulty: f64,
-    fee: f64,
     chainwork: []const u8,
     strippedsize: u32,
     weight: u32,
