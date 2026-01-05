@@ -37,25 +37,78 @@ pub const BlockProcessor = struct {
         defer parsed.deinit();
 
         const block = parsed.value;
-        for (block.tx) |tx| {
-            std.debug.print("txid: {s} with {d} inputs and {d} outputs\n", .{ tx.txid, tx.vin.len, tx.vout.len });
 
-            for (tx.vin, 0..) |input, i| {
-                std.debug.print("Input {d}:\n", .{i});
-                if (input.coinbase) |coinbase| {
-                    std.debug.print("\tCoinbase - {s}\n", .{coinbase});
-                } else if (input.txid) |txid| {
-                    std.debug.print("\tSpends {s}:{d}\n", .{ txid, input.vout orelse 0 });
-                }
-            }
+        // below 5LOC just for debugging
+        // var out: std.io.Writer.Allocating = .init(self.allocator);
+        // try std.json.Stringify.value(block, .{ .whitespace = .indent_2 }, &out.writer);
+        // var arr = out.toArrayList();
+        // defer arr.deinit(self.allocator);
+        // std.debug.print("Block: {s}\n", .{arr.items});
 
-            for (tx.vout, 0..) |output, i| {
-                std.debug.print("Output {d}:\n", .{i});
-                std.debug.print("\tValue {d}\n", .{output.value});
-                if (output.scriptPubKey.address) |address| {
-                    std.debug.print("\tAddress {s}\n", .{address});
-                }
-            }
+        const conn = try self.db.pool.acquire();
+        defer self.db.pool.release(conn);
+
+        try conn.begin();
+        errdefer {
+            conn.rollback() catch |err| {
+                std.debug.print("failed to rollback transaction: {}\n", .{err});
+            };
         }
+
+        std.log.info("insert block: {s} | height {d} | txs {d}\n", .{ block.hash, block.height, block.nTx });
+        const block_result = try conn.query(
+            \\INSERT INTO blocks (
+            \\  height, hash, previous_hash, next_hash, chainwork, version, version_hex,
+            \\  bits, difficulty, time, mediantime, stripped_size, size, weight, tx_count
+            \\) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            \\RETURNING id
+        , .{ block.height, block.hash, block.previousblockhash, block.nextblockhash, block.chainwork, block.version, block.versionHex, block.bits, block.difficulty, block.time, block.mediantime, block.strippedsize, block.size, block.weight, block.nTx });
+        defer block_result.deinit();
+
+        var block_id: ?i64 = null;
+        if (try block_result.next()) |row| {
+            block_id = row.get(i64, 0);
+        }
+
+        // drain the result to avoid ConnectionBusy error
+        try block_result.drain();
+        const db_block_id = block_id orelse return error.BlockInsertFailed;
+
+        for (block.tx, 0..) |tx, tx_idx| {
+            const tx_result = try conn.query(
+                \\INSERT INTO transactions (
+                \\  block_id, txid, tx_index, version, size, vsize,
+                \\  weight, locktime, is_coinbase, fee
+                \\) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                \\RETURNING id
+            , .{
+                db_block_id,
+                tx.txid,
+                @as(i32, @intCast(tx_idx)),
+                tx.version,
+                tx.size,
+                tx.vsize,
+                tx.weight,
+                tx.locktime,
+                tx.vin.len > 0 and tx.vin[0].coinbase != null,
+                @as(i64, @intFromFloat(tx.fee * 100_000_000)),
+            });
+            defer tx_result.deinit();
+
+            var transaction_id: ?i64 = null;
+            if (try tx_result.next()) |row| {
+                transaction_id = row.get(i64, 0);
+            }
+
+            const db_tx_id = transaction_id orelse return error.TransactionInsertFailed;
+            _ = db_tx_id;
+            // drain the result to avoid ConnectionBusy error
+            try tx_result.drain();
+
+            // TODO: record utxos
+        }
+
+        try conn.commit();
+        std.log.info("ingested block: {s} | height {d} | txs {d}\n", .{ block.hash, block.height, block.nTx });
     }
 };
