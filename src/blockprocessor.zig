@@ -55,14 +55,14 @@ pub const BlockProcessor = struct {
             };
         }
 
-        std.log.info("insert block: {s} | height {d} | txs {d}\n", .{ block.hash, block.height, block.nTx });
+        // std.log.info("injesting block: {s} | height {d} | txs {d}", .{ block.hash, block.height, block.nTx });
         const block_result = try conn.query(
             \\INSERT INTO blocks (
-            \\  height, hash, previous_hash, next_hash, chainwork, version, version_hex,
-            \\  bits, difficulty, time, mediantime, stripped_size, size, weight, tx_count
-            \\) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            \\  height, hash, chainwork, version, version_hex, bits, difficulty,
+            \\  time, mediantime, stripped_size, size, weight, tx_count
+            \\) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             \\RETURNING id
-        , .{ block.height, block.hash, block.previousblockhash, block.nextblockhash, block.chainwork, block.version, block.versionHex, block.bits, block.difficulty, block.time, block.mediantime, block.strippedsize, block.size, block.weight, block.nTx });
+        , .{ block.height, block.hash, block.chainwork, block.version, block.versionHex, block.bits, block.difficulty, block.time, block.mediantime, block.strippedsize, block.size, block.weight, block.nTx });
         defer block_result.deinit();
 
         var block_id: ?i64 = null;
@@ -101,14 +101,44 @@ pub const BlockProcessor = struct {
             }
 
             const db_tx_id = transaction_id orelse return error.TransactionInsertFailed;
-            _ = db_tx_id;
             // drain the result to avoid ConnectionBusy error
             try tx_result.drain();
 
-            // TODO: record utxos
+            for (tx.vout) |output| {
+                _ = try conn.exec(
+                    \\INSERT INTO outputs (
+                    \\  transaction_id, txid, vout, value, script_pubkey_hex,
+                    \\  script_type, address
+                    \\) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                , .{
+                    db_tx_id,
+                    tx.txid,
+                    output.n,
+                    @as(i64, @intFromFloat(output.value * 100_000_000)),
+                    output.scriptPubKey.hex,
+                    output.scriptPubKey.type,
+                    output.scriptPubKey.address,
+                });
+            }
+
+            for (tx.vin, 0..) |input, vin_idx| {
+                _ = try conn.exec(
+                    \\INSERT INTO inputs (
+                    \\  transaction_id, vin, txid,
+                    \\  vout, sequence, is_coinbase
+                    \\) VALUES ($1, $2, $3, $4, $5, $6)
+                , .{
+                    db_tx_id,
+                    @as(i32, @intCast(vin_idx)),
+                    if (input.coinbase) |_| null else input.txid,
+                    if (input.coinbase) |_| null else input.vout,
+                    input.sequence,
+                    if (input.coinbase) |_| true else false,
+                });
+            }
         }
 
         try conn.commit();
-        std.log.info("ingested block: {s} | height {d} | txs {d}\n", .{ block.hash, block.height, block.nTx });
+        std.log.info("✅ block: {s} | height {d} | txs {d}", .{ block.hash, block.height, block.nTx });
     }
 };
