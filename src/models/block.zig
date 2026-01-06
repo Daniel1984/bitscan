@@ -54,8 +54,6 @@ pub const Transaction = struct {
 pub const BlockResponse = struct {
     id: ?u64 = 0,
     hash: []const u8,
-    previousblockhash: []const u8,
-    nextblockhash: []const u8,
     merkleroot: []const u8,
     nTx: u32,
     time: u32,
